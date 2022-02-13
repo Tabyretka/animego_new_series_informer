@@ -6,7 +6,7 @@ import aioschedule
 import datetime
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
-from config import bot_token, start_url
+from config import bot_token, start_url, admin_id
 
 bot = Bot(bot_token)
 dp = Dispatcher(bot)
@@ -14,35 +14,53 @@ dp = Dispatcher(bot)
 url = start_url
 
 
+@dp.message_handler(commands=['start'])
+async def start(message: Message):
+    if message.chat.id == admin_id:
+        await bot.send_message(admin_id,
+                               'Пришли мне ссылку на тайтл с animego.org и я буду уведомлять тебя о новых сериях.')
+        if url != '':
+            await bot.send_message(admin_id, 'В данный момент нет отслеживаемого тайтла.')
+        else:
+            await bot.send_message(admin_id, f'В данный момент отслеживается тайтл по ссылке:\n{url}')
+    else:
+        await message.reply('access denied :)')
+
+
 @dp.message_handler(content_types=['text'])
 async def change_url(message: Message):
-    if message.chat.id == 742378205 and 'animego.org' in message.text:
+    if message.chat.id == admin_id and 'animego.org' in message.text:
         global url
         url = message.text
-        await bot.send_message(message.chat.id, 'ok!')
+        await bot.send_message(message.chat.id, 'Ожидаемый тайт упешно изменен!')
         await check_time()
     else:
-        await bot.send_message(message.chat.id, 'инвалид айди')
+        await bot.send_message(message.chat.id, 'Произошла ошибка!')
 
 
 async def check_time():
-    months = {'января': 1, 'февраля': 2, 'марта': 3, 'апреля': 4, 'мая': 5, 'июня': 6,
-              'июля': 7, 'августа': 8, 'сентября': 9, 'октября': 10, 'ноября': 11, 'декабря': 12}
-    current_date = datetime.date.today()
     global url
-    episode_name, episode_number, release_date = await get_data(url=url)
-    if episode_name is not None:
-        ddd = release_date.split(' ')
-        day = int(ddd[0])
-        month = months.get(ddd[1])
-        year = int(ddd[2])
-        if current_date.month == month and current_date.day == day - 1 and current_date.year == year:
-            await bot.send_message(742378205,
-                                   f'Name: {episode_name}\nEpisode number: {episode_number}\nRelease date: {release_date}\nEpisode comes out tomorrow!!!')
-        elif current_date.month == month and current_date.day == day and current_date.year == year:
-            await bot.send_message(742378205, 'The episode is out today! Run to watch!!!')
-        else:
-            await bot.send_message(742378205, f'Last episode coming out {release_date}')
+    if url != '':
+        months = {'января': 1, 'февраля': 2, 'марта': 3, 'апреля': 4, 'мая': 5, 'июня': 6,
+                  'июля': 7, 'августа': 8, 'сентября': 9, 'октября': 10, 'ноября': 11, 'декабря': 12}
+        current_date = datetime.date.today()
+        episode_name, episode_number, release_date = await get_data(url=url)
+        if episode_name is not None:
+            ddd = release_date.split(' ')
+            day = int(ddd[0])
+            month = months.get(ddd[1])
+            year = int(ddd[2])
+            if current_date.month == month and current_date.day == day - 1 and current_date.year == year:
+                await bot.send_message(admin_id,
+                                       f'Name: {episode_name}\nEpisode number: {episode_number}\nRelease date: {release_date}\nEpisode comes out tomorrow!!!')
+            elif current_date.month == month and current_date.day == day and current_date.year == year:
+                await bot.send_message(admin_id, f'Эпизод "{episode_name}" выходит уже сегодня, бегом смотреть!\n')
+            elif current_date.month >= month and current_date.day > day and current_date.year >= year:
+                await bot.send_message(admin_id,
+                                       'Нет информации о новых сериях, возможно, сезон закончился.\nТайтл будет снят с отслеживания.')
+                url = ''
+            else:
+                await bot.send_message(admin_id, f'Следующий эпизод выйдет {release_date}')
 
 
 async def get_data(url):
