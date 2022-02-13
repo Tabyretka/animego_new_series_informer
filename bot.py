@@ -18,8 +18,8 @@ url = start_url
 async def start(message: Message):
     if message.chat.id == admin_id:
         await bot.send_message(admin_id,
-                               'Пришли мне ссылку на тайтл с animego.org и я буду уведомлять тебя о новых сериях.')
-        if url != '':
+                               'Пришли мне ссылку на тайтл с animego.org и я буду уведомлять тебя о новых сериях.\nПроверка происходит каждый день в 09:00')
+        if url == '':
             await bot.send_message(admin_id, 'В данный момент нет отслеживаемого тайтла.')
         else:
             await bot.send_message(admin_id, f'В данный момент отслеживается тайтл по ссылке:\n{url}')
@@ -44,8 +44,9 @@ async def check_time():
         months = {'января': 1, 'февраля': 2, 'марта': 3, 'апреля': 4, 'мая': 5, 'июня': 6,
                   'июля': 7, 'августа': 8, 'сентября': 9, 'октября': 10, 'ноября': 11, 'декабря': 12}
         current_date = datetime.date.today()
-        episode_name, episode_number, release_date = await get_data(url=url)
-        if episode_name is not None:
+        sp = await get_data(url=url)
+        if sp is not None:
+            episode_name, episode_number, release_date = sp[0], sp[1], sp[2]
             ddd = release_date.split(' ')
             day = int(ddd[0])
             month = months.get(ddd[1])
@@ -57,10 +58,15 @@ async def check_time():
                 await bot.send_message(admin_id, f'Эпизод "{episode_name}" выходит уже сегодня, бегом смотреть!\n')
             elif current_date.month >= month and current_date.day > day and current_date.year >= year:
                 await bot.send_message(admin_id,
-                                       'Нет информации о новых сериях, возможно, сезон закончился.\nТайтл будет снят с отслеживания.')
+                                       'Нет информации о новых сериях, возможно, сезон закончился.\nТайтл снят с отслеживания.')
                 url = ''
             else:
-                await bot.send_message(admin_id, f'Следующий эпизод выйдет {release_date}')
+                await bot.send_message(admin_id,
+                                       f'Следующий эпизод выйдет {release_date}\nВы будете уведомлены о новых сериях.')
+        else:
+            await bot.send_message(admin_id,
+                                   'Нет информации о новых сериях, возможно, сезон закончился.\nТайтл снят с отслеживания.')
+            url = ''
 
 
 async def get_data(url):
@@ -81,7 +87,7 @@ async def get_data(url):
                                                     class_='col-6 col-sm-3 col-md-3 col-lg-3 text-right text-truncate').find(
                     'a')
                 release_date = episode_release.find('span').text
-                return episode_name, episode_number, release_date
+                return [episode_name, episode_number, release_date]
     except Exception as ex:
         print(f'{ex}')
         return None
